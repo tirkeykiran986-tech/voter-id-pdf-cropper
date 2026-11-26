@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSC VLE - Exact PVC Size e-EPIC Voter ID Cropper</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, sans-serif; }
+  body { background: #f0f2f5; color: #1e293b; display: flex; flex-direction: column; min-height: 100vh; }
+  
+  .header { background: #1e3a8a; color: white; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header span { font-size: 12px; background: #16a34a; padding: 4px 10px; border-radius: 20px; font-weight: 600; }
+
+  .container { display: flex; flex-wrap: wrap; gap: 20px; padding: 20px; max-width: 1250px; margin: 0 auto; width: 100%; }
+  
+  .controls { flex: 1; min-width: 310px; max-width: 390px; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); height: fit-content; }
+  .upload-box { border: 2px dashed #3b82f6; background: #eff6ff; border-radius: 10px; padding: 20px 15px; text-align: center; cursor: pointer; transition: 0.2s; display: block; }
+  .upload-box:hover { background: #dbeafe; }
+  .upload-box input { display: none; }
+  .upload-box p { font-size: 15px; font-weight: 600; color: #1d4ed8; margin-bottom: 4px; }
+  .upload-box small { font-size: 12px; color: #64748b; }
+
+  .status { margin-top: 12px; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 500; text-align: center; display: none; }
+  .status.success { background: #dcfce7; color: #166534; display: block; }
+  .status.loading { background: #fef9c3; color: #854d0e; display: block; }
+  .status.error { background: #fee2e2; color: #991b1b; display: block; }
+
+  .settings { margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 14px; }
+  .settings label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; margin-bottom: 5px; color: #334155; }
+  .settings input[type="range"] { width: 100%; margin-bottom: 12px; accent-color: #2563eb; }
+  
+  .mode-btns { display: flex; gap: 8px; margin-bottom: 14px; }
+  .mode-btns button { flex: 1; padding: 8px; border: 1px solid #cbd5e1; background: #f8fafc; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .mode-btns button.active { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+
+  .tip-box { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; font-size: 12px; padding: 8px 10px; border-radius: 6px; margin-bottom: 12px; line-height: 1.4; }
+
+  .action-btn { width: 100%; padding: 11px; border: none; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: 0.2s; }
+  .btn-print { background: #16a34a; color: white; }
+  .btn-print:hover { background: #15803d; }
+  .btn-download { background: #2563eb; color: white; }
+  .btn-download:hover { background: #1d4ed8; }
+  .btn-reset { background: #e2e8f0; color: #334155; font-size: 12px; padding: 7px; }
+
+  .preview-area { flex: 2; min-width: 340px; display: flex; justify-content: center; align-items: flex-start; background: #cbd5e1; padding: 20px; border-radius: 12px; overflow: auto; }
+  
+  /* Exact A4 Sheet (210mm x 297mm) */
+  .a4-sheet {
+    width: 210mm;
+    height: 297mm;
+    background: white;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    padding-top: 12mm;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    position: relative;
+  }
+
+  .card-row {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 6mm;
+  }
+  .card-row.foldable { gap: 0; }
+
+  /* Default PVC Print Size: 88mm x 55mm */
+  .id-card-box {
+    width: 88mm;
+    height: 55mm;
+    border: 0.2mm solid #cbd5e1;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f8fafc;
+    position: relative;
+  }
+  .id-card-box.has-card { border: none; }
+  .id-card-box canvas {
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    display: block;
+  }
+  .placeholder-text { font-size: 12px; color: #94a3b8; font-weight: 600; }
+
+  @media print {
+    body { background: white; }
+    .header, .controls { display: none !important; }
+    .container { padding: 0; margin: 0; max-width: 100%; }
+    .preview-area { background: white; padding: 0; overflow: visible; }
+    .a4-sheet { box-shadow: none; margin: 0; width: 210mm; height: 297mm; page-break-after: always; }
+    .id-card-box { border: none !important; }
+    @page { size: A4 portrait; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>CSC VLE - Exact PVC Size e-EPIC Cropper</h1>
+  <span>PVC Size: 88mm &times; 55mm</span>
+</div>
+
+<div class="container">
+  <div class="controls">
+    <label class="upload-box" id="dropZone">
+      <input type="file" id="fileInput" accept="application/pdf,image/*">
+      <p>📄 e-EPIC PDF या इमेज चुनें</p>
+      <small>क्लिक करें या फाइल यहाँ ड्रॉप करें</small>
+    </label>
+
+    <div id="statusMsg" class="status"></div>
+
+    <div class="settings">
+      <label>प्रिंट लेआउट चुनें:</label>
+      <div class="mode-btns">
+        <button id="btnSeparate" class="active" onclick="setLayout('separate')">अलग-अलग (PVC Cut)</button>
+        <button id="btnFoldable" onclick="setLayout('foldable')">जुड़ा हुआ (Lamination)</button>
+      </div>
+
+      <label>कार्ड की चौड़ाई (Width): <span id="widthVal">88.0 mm</span></label>
+      <input type="range" id="cardWidth" min="84" max="94" step="0.5" value="88" oninput="updateCardSize()">
+
+      <label>कार्ड की ऊँचाई (Height): <span id="heightVal">55.0 mm</span></label>
+      <input type="range" id="cardHeight" min="52" max="60" step="0.5" value="55" oninput="updateCardSize()">
+
+      <label>किनारों की सफाई (Edge Trim): <span id="trimVal">6 px</span></label>
+      <input type="range" id="edgeTrim" min="0" max="20" value="6" oninput="renderCroppedCards()">
+
+      <label>चमक (Brightness): <span id="brightVal">102%</span></label>
+      <input type="range" id="brightness" min="80" max="140" value="102" oninput="applyFilters()">
+
+      <label>कंट्रास्ट (Contrast): <span id="contrastVal">105%</span></label>
+      <input type="range" id="contrast" min="80" max="150" value="105" oninput="applyFilters()">
+
+      <button class="action-btn btn-reset" onclick="resetFilters()">साइज और फिल्टर रीसेट करें</button>
+    </div>
+
+    <div class="tip-box">
+      <strong>⚠️ असली साइज के लिए प्रिंट टिप:</strong> प्रिंट डायलॉग में <b>Margins: None</b> और <b>Scale: 100%</b> ज़रूर चुनें, वरना प्रिंटर कार्ड छोटा कर देगा।
+    </div>
+
+    <button class="action-btn btn-print" onclick="window.print()">🖨️ प्रिंट करें (Print A4 Sheet)</button>
+    <button class="action-btn btn-download" onclick="downloadA4PNG()">⬇️ हाई-क्वालिटी A4 PNG डाउनलोड करें</button>
+  </div>
+
+  <div class="preview-area">
+    <div class="a4-sheet" id="a4Sheet">
+      <div class="card-row" id="cardRow">
+        <div class="id-card-box" id="frontBox">
+          <span class="placeholder-text">FRONT CARD</span>
+          <canvas id="frontCanvas" style="display:none;"></canvas>
+        </div>
+        <div class="id-card-box" id="backBox">
+          <span class="placeholder-text">BACK CARD</span>
+          <canvas id="backCanvas" style="display:none;"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<canvas id="sourceCanvas" style="display:none;"></canvas>
+
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+  }
+
+  const fileInput = document.getElementById('fileInput');
+  const dropZone = document.getElementById('dropZone');
+  const statusMsg = document.getElementById('statusMsg');
+  const sourceCanvas = document.getElementById('sourceCanvas');
+  const frontCanvas = document.getElementById('frontCanvas');
+  const backCanvas = document.getElementById('backCanvas');
+
+  let detectedBounds = null;
+
+  function showStatus(text, type) {
+    statusMsg.textContent = text;
+    statusMsg.className = 'status ' + type;
+  }
+
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.background = '#dbeafe'; });
+  dropZone.addEventListener('dragleave', () => { dropZone.style.background = '#eff6ff'; });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.style.background = '#eff6ff';
+    if (e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]);
+  });
+
+  fileInput.addEventListener('change', (e) => {
+    if (e.target.files.length) handleFile(e.target.files[0]);
+  });
+
+  async function handleFile(file) {
+    showStatus('⏳ फाइल स्कैन हो रही है, कृपया प्रतीक्षा करें...', 'loading');
+    try {
+      if (file.type === 'application/pdf') {
+        const arrayBuffer = await file.arrayBuffer();
+        const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer, disableWorker: true });
+        const pdf = await loadingTask.promise;
+        const page = await pdf.getPage(1);
+        
+        const viewport = page.getViewport({ scale: 3.5 });
+        sourceCanvas.width = viewport.width;
+        sourceCanvas.height = viewport.height;
+        const ctx = sourceCanvas.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, sourceCanvas.width, sourceCanvas.height);
+
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+        autoDetectAndCrop(sourceCanvas);
+      } else if (file.type.startsWith('image/')) {
+        const img = new Image();
+        img.onload = () => {
+          sourceCanvas.width = img.width;
+          sourceCanvas.height = img.height;
+          const ctx = sourceCanvas.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          autoDetectAndCrop(sourceCanvas);
+        };
+        img.src = URL.createObjectURL(file);
+      } else {
+        showStatus('❌ कृपया सही PDF या इमेज फाइल चुनें।', 'error');
+      }
+    } catch (err) {
+      console.error(err);
+      showStatus('❌ फाइल पढ़ने में त्रुटि: ' + err.message, 'error');
+    }
+  }
+
+  function autoDetectAndCrop(canvas) {
+    const w = canvas.width;
+    const h = canvas.height;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.getImageData(0, 0, w, h).data;
+
+    function isNonWhite(x, y) {
+      const idx = (y * w + x) * 4;
+      const r = imgData[idx], g = imgData[idx + 1], b = imgData[idx + 2];
+      return (r < 245 || g < 245 || b < 245);
+    }
+
+    const scanMaxY = Math.floor(h * 0.48);
+    let rowDensity = new Array(scanMaxY).fill(0);
+
+    for (let y = 10; y < scanMaxY; y++) {
+      let count = 0;
+      for (let x = Math.floor(w * 0.04); x < Math.floor(w * 0.96); x += 2) {
+        if (isNonWhite(x, y)) count++;
+      }
+      rowDensity[y] = count;
+    }
+
+    const minRowPixels = (w * 0.92 / 2) * 0.35;
+    let topY = -1;
+    for (let y = 10; y < scanMaxY - 20; y++) {
+      if (rowDensity[y] > minRowPixels && rowDensity[y + 5] > minRowPixels && rowDensity[y + 10] > minRowPixels) {
+        topY = y;
+        break;
+      }
+    }
+    if (topY === -1) topY = Math.floor(h * 0.04);
+
+    let bottomY = -1;
+    const expectedMinHeight = Math.floor(w * 0.24);
+    for (let y = topY + expectedMinHeight; y < scanMaxY; y++) {
+      if (rowDensity[y] < minRowPixels * 0.25 && rowDensity[y + 4] < minRowPixels * 0.25) {
+        bottomY = y;
+        break;
+      }
+    }
+    if (bottomY === -1) bottomY = topY + Math.floor(w * 0.285);
+
+    let leftX = w, rightX = 0;
+    const stepY = Math.max(1, Math.floor((bottomY - topY) / 40));
+
+    for (let x = 10; x < w - 10; x++) {
+      let activeCols = 0;
+      for (let y = topY + 5; y < bottomY - 5; y += stepY) {
+        if (isNonWhite(x, y)) activeCols++;
+      }
+      if (activeCols >= 8) {
+        if (x < leftX) leftX = x;
+        if (x > rightX) rightX = x;
+      }
+    }
+
+    if (leftX >= rightX) {
+      leftX = Math.floor(w * 0.05);
+      rightX = Math.floor(w * 0.95);
+    }
+
+    const midX = Math.floor((leftX + rightX) / 2);
+    let frontRightX = midX;
+    let backLeftX = midX;
+
+    const searchMargin = Math.floor((rightX - leftX) * 0.03);
+    let gapStart = -1, gapEnd = -1;
+    for (let x = midX - searchMargin; x <= midX + searchMargin; x++) {
+      let active = 0;
+      for (let y = topY + 10; y < bottomY - 10; y += stepY) {
+        if (isNonWhite(x, y)) active++;
+      }
+      if (active <= 3) {
+        if (gapStart === -1) gapStart = x;
+        gapEnd = x;
+      }
+    }
+
+    if (gapStart !== -1 && gapEnd >= gapStart) {
+      frontRightX = gapStart;
+      backLeftX = gapEnd;
+    }
+
+    detectedBounds = { leftX, rightX, topY, bottomY, frontRightX, backLeftX };
+    renderCroppedCards();
+    showStatus('✅ ऑटो-क्रॉप सफल! PVC साइज (88mm × 55mm) पर सेट है।', 'success');
+  }
+
+  function renderCroppedCards() {
+    if (!detectedBounds) return;
+    const trim = parseInt(document.getElementById('edgeTrim').value, 10) || 0;
+    document.getElementById('trimVal').textContent = trim + ' px';
+
+    const { leftX, rightX, topY, bottomY, frontRightX, backLeftX } = detectedBounds;
+
+    const fX = leftX + trim;
+    const fY = topY + trim;
+    const fW = Math.max(50, (frontRightX - trim) - fX);
+    const fH = Math.max(50, (bottomY - trim) - fY);
+
+    const bX = backLeftX + trim;
+    const bY = topY + trim;
+    const bW = Math.max(50, (rightX - trim) - bX);
+    const bH = Math.max(50, (bottomY - trim) - bY);
+
+    frontCanvas.width = 1040;
+    frontCanvas.height = 650;
+    const fCtx = frontCanvas.getContext('2d');
+    fCtx.drawImage(sourceCanvas, fX, fY, fW, fH, 0, 0, frontCanvas.width, frontCanvas.height);
+
+    backCanvas.width = 1040;
+    backCanvas.height = 650;
+    const bCtx = backCanvas.getContext('2d');
+    bCtx.drawImage(sourceCanvas, bX, bY, bW, bH, 0, 0, backCanvas.width, backCanvas.height);
+
+    document.querySelectorAll('.placeholder-text').forEach(el => el.style.display = 'none');
+    document.getElementById('frontBox').classList.add('has-card');
+    document.getElementById('backBox').classList.add('has-card');
+    frontCanvas.style.display = 'block';
+    backCanvas.style.display = 'block';
+    applyFilters();
+  }
+
+  function updateCardSize() {
+    const w = parseFloat(document.getElementById('cardWidth').value);
+    const h = parseFloat(document.getElementById('cardHeight').value);
+    document.getElementById('widthVal').textContent = w.toFixed(1) + ' mm';
+    document.getElementById('heightVal').textContent = h.toFixed(1) + ' mm';
+
+    document.getElementById('frontBox').style.width = w + 'mm';
+    document.getElementById('frontBox').style.height = h + 'mm';
+    document.getElementById('backBox').style.width = w + 'mm';
+    document.getElementById('backBox').style.height = h + 'mm';
+  }
+
+  function setLayout(mode) {
+    const row = document.getElementById('cardRow');
+    const btnSep = document.getElementById('btnSeparate');
+    const btnFold = document.getElementById('btnFoldable');
+    if (mode === 'foldable') {
+      row.classList.add('foldable');
+      btnFold.classList.add('active');
+      btnSep.classList.remove('active');
+    } else {
+      row.classList.remove('foldable');
+      btnSep.classList.add('active');
+      btnFold.classList.remove('active');
+    }
+  }
+
+  function applyFilters() {
+    const b = document.getElementById('brightness').value;
+    const c = document.getElementById('contrast').value;
+    document.getElementById('brightVal').textContent = b + '%';
+    document.getElementById('contrastVal').textContent = c + '%';
+    const filterStr = `brightness(${b}%) contrast(${c}%)`;
+    frontCanvas.style.filter = filterStr;
+    backCanvas.style.filter = filterStr;
+  }
+
+  function resetFilters() {
+    document.getElementById('cardWidth').value = 88;
+    document.getElementById('cardHeight').value = 55;
+    updateCardSize();
+    document.getElementById('edgeTrim').value = 6;
+    document.getElementById('brightness').value = 102;
+    document.getElementById('contrast').value = 105;
+    renderCroppedCards();
+  }
+
+  function downloadA4PNG() {
+    if (frontCanvas.style.display === 'none') {
+      showStatus('⚠️ पहले e-EPIC PDF या इमेज अपलोड करें।', 'error');
+      return;
+    }
+    const a4 = document.createElement('canvas');
+    a4.width = 2480; // 210mm at 300 DPI
+    a4.height = 3508; // 297mm at 300 DPI
+    const ctx = a4.getContext('2d');
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, a4.width, a4.height);
+
+    const b = document.getElementById('brightness').value;
+    const c = document.getElementById('contrast').value;
+    ctx.filter = `brightness(${b}%) contrast(${c}%)`;
+
+    const wMm = parseFloat(document.getElementById('cardWidth').value);
+    const hMm = parseFloat(document.getElementById('cardHeight').value);
+    const pxPerMm = 2480 / 210; // ~11.81 px/mm
+
+    const cardW = Math.round(wMm * pxPerMm);
+    const cardH = Math.round(hMm * pxPerMm);
+    const isFoldable = document.getElementById('cardRow').classList.contains('foldable');
+    const gap = isFoldable ? 0 : Math.round(6 * pxPerMm);
+    const startX = Math.floor((a4.width - (cardW * 2 + gap)) / 2);
+    const startY = Math.round(12 * pxPerMm);
+
+    ctx.drawImage(frontCanvas, startX, startY, cardW, cardH);
+    ctx.drawImage(backCanvas, startX + cardW + gap, startY, cardW, cardH);
+
+    const link = document.createElement('a');
+    link.download = `Voter_ID_${wMm}x${hMm}mm_A4.png`;
+    link.href = a4.toDataURL('image/png');
+    link.click();
+  }
+</script>
+</body>
+</html>
